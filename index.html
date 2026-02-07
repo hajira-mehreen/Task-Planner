@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Task Planner</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+  <style>
+    * { 
+      box-sizing: border-box; 
+      margin: 0; 
+      padding: 0; 
+      font-family: "Segoe UI", Arial, sans-serif; 
+    }
+
+    body {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #dbeafe, #f0f9ff);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .planner {
+      background: #fff;
+      width: 100%;
+      max-width: 450px;
+      padding: 22px;
+      border-radius: 18px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.12);
+    }
+
+    .planner h2 { 
+      text-align: center; 
+      margin-bottom: 16px; 
+      color: #1e3a8a; 
+    }
+
+    input[type="date"], .task-input input, .search-box input {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid #c7d2fe;
+      outline: none;
+    }
+
+    input[type="date"] { 
+      margin-bottom: 12px; 
+    }
+
+    .task-input, .search-box { 
+      display: flex; 
+      gap: 8px; 
+      margin-bottom: 12px; 
+    }
+
+    .task-input button, .search-box button {
+      padding: 0 14px;
+      border-radius: 10px;
+      border: none;
+      color: #fff;
+      cursor: pointer;
+    }
+
+    .task-input button { 
+      background: #2563eb; 
+    }
+    
+    .search-box button { 
+      background: #64748b; 
+    }
+
+    ul { 
+      margin-top: 10px; 
+    }
+
+    li {
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #f8fafc;
+      padding: 10px;
+      border-radius: 12px;
+      margin-bottom: 8px;
+    }
+
+    li span { 
+      font-size: 14px; 
+    }
+    
+    li.done span { 
+      text-decoration: line-through; 
+      color: #64748b; 
+    }
+
+    li button {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 15px;
+    }
+
+    .edit-btn { 
+      color: #0284c7; 
+    }
+
+    .save-btn { 
+      color: #16a34a; 
+    }
+
+    .delete-btn { 
+      color: #dc2626; 
+    }
+
+    #allTasksBtn{
+      margin-top:10px; 
+      width:100%; 
+      padding:10px; 
+      border:none; 
+      border-radius:10px; 
+      background:#475569; 
+      color:#fff; 
+      cursor:pointer;
+    }
+
+    #statusMsg{
+      text-align:center; 
+      font-size:15px; 
+      color:#262b33; 
+      margin-top:8px;
+    }
+
+    @media (max-width: 480px) {
+      .planner { 
+        padding: 16px; 
+      }
+
+      .task-input button, .search-box button {
+        padding: 6px 8px;
+        font-size: 14px;
+        width: 44px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div class="planner">
+  <h2><i class="fa-solid fa-calendar-days"></i> Task Planner</h2>
+
+  <input type="date" id="datePicker">
+
+  <div class="task-input">
+    <input type="text" id="taskInput" placeholder="Add a task..." required>
+    <button id="addTaskBtn"><i class="fa-solid fa-plus"></i></button>
+  </div>
+
+  <div class="search-box">
+    <input type="text" id="searchInput" placeholder="Search tasks..." required>
+    <button id="searchBtn"><i class="fa-solid fa-magnifying-glass"></i></button>
+    <button id="clearSearch"><i class="fa-solid fa-xmark"></i></button>
+  </div>
+
+  <button id="allTasksBtn">
+    <i class="fa-solid fa-list"></i> All Tasks
+  </button>
+
+  <div id="statusMsg"></div>
+  <ul id="taskList"></ul>
+</div>
+
+<script>
+  const datePicker = document.getElementById("datePicker");
+  const taskInput = document.getElementById("taskInput");
+  const addTaskBtn = document.getElementById("addTaskBtn");
+  const taskList = document.getElementById("taskList");
+  const searchInput = document.getElementById("searchInput");
+  const clearSearch = document.getElementById("clearSearch");
+  const searchBtn = document.getElementById("searchBtn");
+  const allTasksBtn = document.getElementById("allTasksBtn");
+  const statusMsg = document.getElementById("statusMsg");
+
+  let allTasksVisible = true;
+
+  let tasks;
+  try {
+    const stored = JSON.parse(localStorage.getItem("tasks"));
+    tasks = stored && typeof stored === "object" ? stored : {};
+  } catch { tasks = {}; }
+
+  const today = new Date().toISOString().split("T")[0];
+  datePicker.value = today;
+
+  function saveTasks() {
+    localStorage.setItem("tasks", JSON.stringify(tasks));
+  }
+
+  searchInput.addEventListener("input", () => {
+    if (!searchInput.value.trim()) statusMsg.textContent = "";
+  });
+
+  function renderList(items) {
+    taskList.innerHTML = "";
+    const keyword = searchInput.value.trim();
+
+    if (!items.length) {
+      statusMsg.textContent = keyword ? "No results found!" : "";
+      return;
+    }
+
+    statusMsg.textContent = "";
+    items.forEach(item => createTaskItem(item.task, item.date));
+  }
+
+  function createTaskItem(task, date) {
+    const li = document.createElement("li");
+    if (task.done) li.classList.add("done");
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = task.done;
+    checkbox.onchange = () => {
+      task.done = checkbox.checked;
+      saveTasks();
+      refreshView("all");
+    };
+
+    const textWrap = document.createElement("div");
+    textWrap.style.flex = "1";
+
+    const dateLabel = document.createElement("div");
+    dateLabel.style.fontSize = "11px";
+    dateLabel.style.color = "#475569";
+    dateLabel.textContent = date;
+
+    const span = document.createElement("span");
+    span.textContent = task.text;
+
+    textWrap.append(dateLabel, span);
+
+    const editBtn = document.createElement("button");
+    editBtn.className = "edit-btn";
+    editBtn.innerHTML = '<i class="fa-solid fa-pen"></i>';
+
+    editBtn.onclick = () => {
+      if (!textWrap.contains(span)) return;
+
+      const input = document.createElement("input");
+      input.type = "text";
+      input.value = task.text;
+      input.style.width = "100%";  
+
+      const saveBtn = document.createElement("button");
+      saveBtn.className = "save-btn";
+      saveBtn.innerHTML = '<i class="fa-solid fa-check"></i>';
+
+      if (textWrap.contains(span)) textWrap.replaceChild(input, span);
+      if (li.contains(editBtn)) li.replaceChild(saveBtn, editBtn);
+      input.focus();
+
+      const saveEdit = () => {
+        if (!textWrap.contains(input)) return;
+        const newText = input.value.trim();
+        if (newText) task.text = newText;
+        saveTasks();
+        refreshView("all");
+      };
+
+      saveBtn.onclick = saveEdit;
+      input.addEventListener("keydown", e => { if (e.key === "Enter") saveEdit(); });
+    };
+
+    const deleteBtn = document.createElement("button");
+    deleteBtn.className = "delete-btn";
+    deleteBtn.innerHTML = '<i class="fa-solid fa-trash"></i>';
+    deleteBtn.onclick = () => {
+      const list = tasks[date];
+      if (!Array.isArray(list)) return;
+      const idx = list.indexOf(task);
+      if (idx === -1) return;
+      list.splice(idx, 1);
+      if (!list.length) delete tasks[date];
+      saveTasks();
+      refreshView("all");
+    };
+
+    li.append(checkbox, textWrap, editBtn, deleteBtn);
+    taskList.appendChild(li);
+  }
+
+  function refreshView(mode = "all") {
+    if (!allTasksVisible && mode === "all") {
+      taskList.innerHTML = "";
+      statusMsg.textContent = "";
+      return;
+    }
+
+    const keyword = searchInput.value.trim().toLowerCase();
+    const items = [];
+
+   Object.keys(tasks).forEach(date => {
+      tasks[date].forEach(task => {
+        if (mode === "search") {
+        const textMatch = task.text.toLowerCase().includes(keyword);
+        const dateMatch = date.includes(keyword);
+        if (!textMatch && !dateMatch) return;
+      }
+        items.push({ task, date });
+      });
+    });
+
+    renderList(items);
+  }
+
+  addTaskBtn.onclick = () => {
+    const text = taskInput.value.trim();
+    if (!text) { taskInput.reportValidity(); return; }
+
+    const date = datePicker.value;
+    if (!Array.isArray(tasks[date])) tasks[date] = [];
+    tasks[date].push({ text, done: false });
+    saveTasks();
+    taskInput.value = "";
+    refreshView("all");
+  };
+
+  searchBtn.onclick = () => {
+    const value = searchInput.value.trim();
+    if (!value) {
+      statusMsg.textContent = "";
+      searchInput.reportValidity();
+      return;
+    }
+    refreshView("search");
+  };
+
+  clearSearch.onclick = () => {
+    searchInput.value = "";
+    statusMsg.textContent = "";
+    refreshView("all");
+  };
+
+  allTasksBtn.onclick = () => {
+    allTasksVisible = !allTasksVisible;
+    refreshView("all");
+  };
+
+  refreshView("all");
+</script>
+</body>
+</html>
